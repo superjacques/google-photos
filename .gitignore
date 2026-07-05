@@ -1,0 +1,31 @@
+# Never commit personal photo data
+*.zip
+*.tgz
+*.tar
+*.tar.gz
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.heic
+*.heif
+*.webp
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.json
+
+# Local/generated private data
+reports/
+*.csv
+*.sqlite
+*.db
+*.log
+
+# Python/cache
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
