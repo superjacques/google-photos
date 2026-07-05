@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BASE="${1:-/home/jacques/backups-4TB/Photos}"
+BASE="${1:-$HOME/backups-4TB/Photos}"
 REPORT_DIR="$BASE/reports"
 REPORT="$REPORT_DIR/status-$(date +%Y%m%d-%H%M%S).txt"
 
@@ -48,7 +48,7 @@ mkdir -p "$REPORT_DIR"
     /\.png$/ { png++ }
     /\.gif$/ { gif++ }
     /\.(heic|heif)$/ { heic++ }
-    /\.(mp4|mov|avi|mkv)$/ { video++ }
+    /\.(mp4|mov|avi|mkv|3gp|m4v)$/ { video++ }
     /\.json$/ { json++ }
     END {
       print "jpg/jpeg:", jpg+0
