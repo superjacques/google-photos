@@ -12,56 +12,51 @@ MEDIA_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".heic", ".heif", ".mp4", ".mov",
 
 def scan_folder(folder, chars, apply):
     files = [x for x in folder.iterdir() if x.is_file() and x.suffix.lower() in MEDIA_EXTS]
-    by_prefix = defaultdict(list)
+    by_prefix_ext = defaultdict(list)
 
     for f in files:
         if len(f.stem) >= chars:
-            by_prefix[f.stem[:chars]].append(f)
+            key = (f.stem[:chars], f.suffix.lower())
+            by_prefix_ext[key].append(f)
 
     rows = []
     delete_count = 0
     delete_bytes = 0
 
-    for prefix, group in sorted(by_prefix.items()):
-        keeper = None
+    for (prefix, ext), group in sorted(by_prefix_ext.items()):
+        keepers = sorted(f for f in group if len(f.stem) == chars)
 
-        for f in sorted(group):
-            # Safety rule:
-            # If chars=n, keeper must be exactly n chars before the extension.
-            # Example keeper: 20211114_120049.jpg
-            # Duplicate must start: 20211114_120049-....
-            if len(f.stem) == chars:
-                keeper = f
-                break
-
-        if not keeper:
+        if not keepers:
             continue
+
+        keeper = keepers[0]
 
         for f in sorted(group):
             if f == keeper:
                 continue
 
-            if not f.stem.startswith(prefix + "-"):
-                continue
-
-            if f.suffix.lower() != keeper.suffix.lower():
+            # User rule:
+            # keeper has exactly n stem chars, meaning filename char n+1 is the dot.
+            # duplicate has the same first n chars, same extension, and a longer stem.
+            if len(f.stem) <= chars:
                 continue
 
             duplicate_bytes = f.stat().st_size
             action = "delete" if apply else "would-delete"
-
-            delete_count += 1
-            delete_bytes += duplicate_bytes
 
             rows.append({
                 "action": action,
                 "year": folder.name,
                 "chars": chars,
                 "prefix": prefix,
+                "extension": ext,
                 "keeper": str(keeper),
                 "duplicate": str(f),
                 "duplicate_bytes": duplicate_bytes,
             })
+
+            delete_count += 1
+            delete_bytes += duplicate_bytes
 
             if apply:
                 f.unlink()
@@ -69,7 +64,7 @@ def scan_folder(folder, chars, apply):
     return rows, delete_count, delete_bytes
 
 def main():
-    p = argparse.ArgumentParser(description="Prune generated suffix duplicates by filename prefix.")
+    p = argparse.ArgumentParser(description="Prune generated prefix duplicates.")
     p.add_argument("--year", help="Single year folder, e.g. 2006")
     p.add_argument("--all-years", action="store_true", help="Scan every folder under 4.compressed")
     p.add_argument("--chars", nargs="+", type=int, default=[9], help="Prefix lengths to compare")
@@ -101,7 +96,8 @@ def main():
     REPORT.parent.mkdir(parents=True, exist_ok=True)
     with REPORT.open("w", newline="", encoding="utf-8") as out:
         writer = csv.DictWriter(out, fieldnames=[
-            "action", "year", "chars", "prefix", "keeper", "duplicate", "duplicate_bytes"
+            "action", "year", "chars", "prefix", "extension",
+            "keeper", "duplicate", "duplicate_bytes"
         ])
         writer.writeheader()
         writer.writerows(all_rows)
