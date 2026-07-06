@@ -1,108 +1,129 @@
 # Google Photos Migration Toolkit
 
-Repeatable toolkit for processing Google Takeout photo exports into a clean, deduplicated, metadata-restored, compressed photo library.
+Repeatable toolkit for turning Google Takeout exports into a clean, deduplicated, compressed photo library.
 
-The goal is to make Google Photos replaceable: exports can be processed locally, cleaned, compressed, and re-uploaded without trusting Google Photos as the permanent source of truth.
+The goal is simple: Google Photos can be replaced because the source exports, scripts, reports, and final library can all be rebuilt locally.
 
-## Local working layout
+## Folder Layout
 
-Local photo data stays outside this repo.
+Local photo data stays outside this repo:
 
-Expected local path:
+    /home/jacques/backups-4TB/Photos/
+    ├── 1.zips/        raw Google Takeout ZIPs, never edited
+    ├── 2.extracted/   raw extracted Takeout folders, never edited
+    ├── 3.master/      verified deduplicated master library
+    ├── 4.compressed/  future compressed upload-ready output
+    ├── reports/       generated CSVs, SQLite DB, manifests, logs
+    └── scripts/       operational copies of repo scripts
 
-    ~/backups-4TB/Photos/
-    ├── 1.zips/       raw Google Takeout ZIPs, never edited
-    ├── 2.extracted/  raw extracted Takeout folders, read-only
-    ├── 3.master/     cleaned final media library
-    ├── reports/      generated local reports and SQLite index
-    └── scripts/      operational copies of scripts
+## Safety Rules
 
-## Safety rules
+- Never edit `1.zips/`.
+- Never edit `2.extracted/`.
+- Do not mutate `3.master/` after it has passed verification.
+- Build compressed output into `4.compressed/`.
+- Do not commit photos, ZIPs, extracted data, reports, CSVs, SQLite databases, logs, or manifests.
+- All repeatable logic belongs in `scripts/` and should be committed to GitHub.
 
-- Never edit `1.zips`.
-- Never edit `2.extracted`.
-- Build clean output into `3.master`.
-- Deduplicate before final output.
-- Restore metadata from Google Takeout JSON sidecars where possible.
-- Compress photos only when above the configured size target.
-- Do not commit photos, ZIPs, extracted Takeout data, private reports, CSVs, databases, or logs.
+## Current Verified Checkpoint
+
+Date: 2026-07-06
+
+- Source media scanned: 82,529 files
+- Source media size: 55.25 GB
+- Deduplicated master files: 49,897
+- Master size: about 39 GB
+- Exact duplicate groups: 26,900
+- Duplicate files skipped from master: 32,632
+- Duplicate media avoided: about 17.28 GB
+- Master verification: passed
+
+Verification result:
+
+- Manifest rows: 49,897
+- Actual master files: 49,897
+- Unique SHA entries: 49,897
+- Missing master files: 0
+- Size mismatches: 0
+- Missing source files: 0
+- Repeated SHA entries: 0
+- Extra master files: 0
+
+## Script Order
+
+Run order used so far:
+
+    scripts/photo-status.sh
+    scripts/1-ingest-takeout-zip.sh
+    scripts/2-inventory-cache.py
+    scripts/3-dedupe-plan.py
+    scripts/4-build-master.py
+    scripts/5-verify-master.py
 
 ## Scripts
 
 ### scripts/photo-status.sh
 
-Quick workspace status report.
-
-Reports:
-
-- folder layout
-- top-level folder sizes
-- ZIP file sizes
-- extracted folder sizes
-- master folder size
-- media counts
-- largest extracted files
-
-Run:
-
-    scripts/photo-status.sh ~/backups-4TB/Photos
+Creates a quick status report for the photo workspace.
 
 ### scripts/1-ingest-takeout-zip.sh
 
-Reusable Takeout ingest script.
-
-It expects exactly one `takeout-*.zip` file in `~/Downloads`.
-
-It:
-
-- tests the ZIP
-- moves it into `1.zips`
-- renames it to the supplied destination name
-- extracts it into the supplied account folder under `2.extracted`
-- runs status
-- runs cached inventory
-- removes any old one-time `move-bigzip.sh` cron entry
-
-Run:
-
-    BASE=/home/jacques/backups-4TB/Photos scripts/1-ingest-takeout-zip.sh jacquesbezuidenhout1980-02.zip jacquesbezuidenhout1980
+Moves one `takeout-*.zip` from Downloads into `1.zips/`, renames it, extracts it into the selected account folder, then runs status and inventory.
 
 ### scripts/2-inventory-cache.py
 
-Cached inventory scanner.
+Scans all media under `2.extracted/`, matches JSON sidecars, calculates SHA-256 hashes, and stores the result in:
 
-It:
+    reports/photo-index.sqlite
 
-- scans all media under `2.extracted`
-- matches media files to Google Takeout JSON sidecars
-- improves matching using JSON `title` fields when filenames are weird/truncated
-- extracts Google metadata fields
-- calculates SHA-256 hashes
-- stores hash results in SQLite
-- skips rehashing unchanged files on future runs
-- writes inventory CSV, duplicate CSV, summary TXT, and `photo-index.sqlite`
+Future runs skip rehashing unchanged files.
 
-Run:
+### scripts/3-dedupe-plan.py
 
-    scripts/2-inventory-cache.py --base /home/jacques/backups-4TB/Photos --hash
+Creates:
 
-Force complete rehash:
+    reports/dedupe-plan-exact.csv
 
-    scripts/2-inventory-cache.py --base /home/jacques/backups-4TB/Photos --hash --rehash
+It selects one keeper per exact duplicate group and marks the rest as duplicates.
 
-## Current workflow
+### scripts/4-build-master.py
 
-1. Put raw Takeout ZIPs in `1.zips` or ingest from `~/Downloads/takeout-*.zip`.
-2. Extract into `2.extracted`.
-3. Run `photo-status.sh`.
-4. Run `2-inventory-cache.py --hash`.
-5. Review reports before creating anything in `3.master`.
-6. Later scripts will build the deduplicated, metadata-restored, compressed master library.
+Builds `3.master/` from the deduplicated hash groups.
 
-## Current target
+It writes:
 
-Photos larger than the configured limit should later be compressed toward approximately 1 MB.
+    reports/master-build-manifest.csv
 
-Files already smaller than the limit should be copied unchanged.
+### scripts/5-verify-master.py
 
-Videos are currently inventoried and deduplicated, but compression policy is still undecided.
+Verifies that `3.master/` exactly matches the manifest.
+
+## Compression Policy Draft
+
+The next output folder should be:
+
+    /home/jacques/backups-4TB/Photos/4.compressed/
+
+Images:
+
+- Compress from `3.master/` into `4.compressed/`.
+- Target image size: roughly 350 KB to 500 KB.
+- Files already below target should be copied unchanged.
+- JPG/JPEG should be compressed toward target size.
+- PNG, HEIC, and HEIF can be converted only when it gives useful savings and keeps normal viewing compatibility.
+- Preserve useful dates and metadata where practical.
+
+Videos:
+
+- Videos should also be considered for compression.
+- Small videos should be copied unchanged.
+- Large videos should be compressed when above a size, bitrate, or resolution threshold.
+- Starting rule to test: compress videos above 25 MB, above 1080p, or with obviously high bitrate.
+- Prefer compatible MP4 output.
+- Video compression must start with a small sample before processing everything.
+
+## Next Step
+
+Create a sample compression script that processes a small set from `3.master/` into `4.compressed-sample/`.
+
+Only after visual review should the full `4.compressed/` library be built.
