@@ -63,7 +63,8 @@ compress_video() {
 
 echo "===== Compressing sample images ====="
 find "$MASTER" -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.heic' -o -iname '*.heif' \) \
-  -printf '%s\t%p\n' | sort -nr | head -10 > "$BASE/reports/compression-sample-images.tmp"
+  -printf '%s	%p
+' | sort -nr | head -10 > "$BASE/reports/compression-sample-images.tmp"
 
 while IFS=$'\t' read -r _size f; do
   compress_image "$f"
@@ -72,7 +73,8 @@ done < "$BASE/reports/compression-sample-images.tmp"
 echo
 echo "===== Compressing sample videos ====="
 find "$MASTER" -type f \( -iname '*.mp4' -o -iname '*.mov' -o -iname '*.3gp' -o -iname '*.m4v' -o -iname '*.avi' -o -iname '*.mkv' \) \
-  -printf '%s\t%p\n' | sort -nr | head -5 > "$BASE/reports/compression-sample-videos.tmp"
+  -printf '%s	%p
+' | sort -nr | head -5 > "$BASE/reports/compression-sample-videos.tmp"
 
 while IFS=$'\t' read -r _size f; do
   compress_video "$f"
