@@ -104,7 +104,7 @@ def build_json_indexes(json_files):
         by_folder_name[str(jp.parent)][jp.name] = jp
         data = read_json(jp)
         title = data.get("title") if isinstance(data, dict) else None
-        if title:
+        if isinstance(title, str) and title.strip():
             by_folder_title[str(jp.parent)][title].append(jp)
 
     return by_exact_path, by_folder_name, by_folder_title
