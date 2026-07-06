@@ -127,3 +127,23 @@ Videos:
 Create a sample compression script that processes a small set from `3.master/` into `4.compressed-sample/`.
 
 Only after visual review should the full `4.compressed/` library be built.
+
+
+### scripts/9-prune-prefix-duplicates.py
+
+Optional aggressive duplicate cleanup for `4.compressed`.
+
+This catches files where one clean keeper exists and generated/reworked variants share the same filename prefix.
+
+Example:
+
+    20211114_120049.jpg
+    20211114_120049-ef5fe89e0737.jpg
+
+The keeper is the file whose stem is exactly `n` characters. Any longer file with the same first `n` characters and same extension can be removed.
+
+Typical run:
+
+    scripts/9-prune-prefix-duplicates.py --all-years --chars $(seq 3 19) --apply
+
+This is intentionally more aggressive than exact hash dedupe and should only be used on `4.compressed`, not on `1.zips`, `2.extracted`, or `3.master`.
