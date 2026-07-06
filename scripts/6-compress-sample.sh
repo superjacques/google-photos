@@ -63,14 +63,14 @@ compress_video() {
 
 echo "===== Compressing sample images ====="
 find "$MASTER" -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.heic' -o -iname '*.heif' \) \
-  -printf '%s\t%p\n' | sort -nr | head -10 | cut -f2- | while read -r f; do
+  -printf '%s\t%p\n' | sort -nr | head -10 | sed "s/^[0-9]*[[:space:]]*//" | while read -r f; do
     compress_image "$f"
   done
 
 echo
 echo "===== Compressing sample videos ====="
 find "$MASTER" -type f \( -iname '*.mp4' -o -iname '*.mov' -o -iname '*.3gp' -o -iname '*.m4v' -o -iname '*.avi' -o -iname '*.mkv' \) \
-  -printf '%s\t%p\n' | sort -nr | head -5 | cut -f2- | while read -r f; do
+  -printf '%s\t%p\n' | sort -nr | head -5 | sed "s/^[0-9]*[[:space:]]*//" | while read -r f; do
     compress_video "$f"
   done
 
