@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import argparse
 import csv
-import subprocess
 from collections import defaultdict
 from pathlib import Path
 
@@ -10,17 +9,6 @@ TARGET = BASE / "4.compressed"
 REPORT = BASE / "reports" / "prefix-duplicate-prune.csv"
 
 MEDIA_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".heic", ".heif", ".mp4", ".mov", ".3gp", ".m4v"}
-
-def probe_dims(path):
-    cmd = [
-        "ffprobe", "-v", "error",
-        "-select_streams", "v:0",
-        "-show_entries", "stream=width,height",
-        "-of", "csv=p=0:s=x",
-        str(path),
-    ]
-    r = subprocess.run(cmd, text=True, capture_output=True)
-    return r.stdout.strip()
 
 def scan_folder(folder, chars, apply):
     files = [x for x in folder.iterdir() if x.is_file() and x.suffix.lower() in MEDIA_EXTS]
@@ -38,16 +26,16 @@ def scan_folder(folder, chars, apply):
         keeper = None
 
         for f in sorted(group):
-            # Safety rule: prefix length n, then next filename character is dot.
-            # Since suffix is removed in stem, this means stem length must equal n.
+            # Safety rule:
+            # If chars=n, keeper must be exactly n chars before the extension.
+            # Example keeper: 20211114_120049.jpg
+            # Duplicate must start: 20211114_120049-....
             if len(f.stem) == chars:
                 keeper = f
                 break
 
         if not keeper:
             continue
-
-        keeper_dims = probe_dims(keeper)
 
         for f in sorted(group):
             if f == keeper:
@@ -59,18 +47,11 @@ def scan_folder(folder, chars, apply):
             if f.suffix.lower() != keeper.suffix.lower():
                 continue
 
-            dims = probe_dims(f)
+            duplicate_bytes = f.stat().st_size
+            action = "delete" if apply else "would-delete"
 
-            if dims != keeper_dims:
-                action = "skip-dimensions-differ"
-                duplicate_bytes = f.stat().st_size
-            else:
-                duplicate_bytes = f.stat().st_size
-                action = "delete" if apply else "would-delete"
-                delete_count += 1
-                delete_bytes += duplicate_bytes
-                if apply:
-                    f.unlink()
+            delete_count += 1
+            delete_bytes += duplicate_bytes
 
             rows.append({
                 "action": action,
@@ -79,10 +60,11 @@ def scan_folder(folder, chars, apply):
                 "prefix": prefix,
                 "keeper": str(keeper),
                 "duplicate": str(f),
-                "keeper_dims": keeper_dims,
-                "duplicate_dims": dims,
                 "duplicate_bytes": duplicate_bytes,
             })
+
+            if apply:
+                f.unlink()
 
     return rows, delete_count, delete_bytes
 
@@ -90,7 +72,7 @@ def main():
     p = argparse.ArgumentParser(description="Prune generated suffix duplicates by filename prefix.")
     p.add_argument("--year", help="Single year folder, e.g. 2006")
     p.add_argument("--all-years", action="store_true", help="Scan every folder under 4.compressed")
-    p.add_argument("--chars", nargs="+", type=int, default=[9], help="Prefix lengths to compare, e.g. 9 15")
+    p.add_argument("--chars", nargs="+", type=int, default=[9], help="Prefix lengths to compare")
     p.add_argument("--apply", action="store_true", help="Actually delete duplicates")
     args = p.parse_args()
 
@@ -119,8 +101,7 @@ def main():
     REPORT.parent.mkdir(parents=True, exist_ok=True)
     with REPORT.open("w", newline="", encoding="utf-8") as out:
         writer = csv.DictWriter(out, fieldnames=[
-            "action", "year", "chars", "prefix", "keeper", "duplicate",
-            "keeper_dims", "duplicate_dims", "duplicate_bytes"
+            "action", "year", "chars", "prefix", "keeper", "duplicate", "duplicate_bytes"
         ])
         writer.writeheader()
         writer.writerows(all_rows)
