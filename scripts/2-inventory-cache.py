@@ -98,7 +98,7 @@ def init_db(db):
 def build_json_indexes(json_files):
     by_exact_path = set(json_files)
     by_folder_name = defaultdict(dict)
-    by_folder_title = defaultdict(dict)
+    by_folder_title = defaultdict(lambda: defaultdict(list))
 
     for jp in json_files:
         by_folder_name[str(jp.parent)][jp.name] = jp
